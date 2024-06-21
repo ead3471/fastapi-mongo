@@ -1,4 +1,4 @@
-from models.admin import Admin
-from models.student import Student
+from models.reestr_object import ReestrObject
 
-__all__ = [Student, Admin]
+
+__all__ = [ReestrObject]

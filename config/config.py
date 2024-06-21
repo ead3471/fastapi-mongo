@@ -19,8 +19,12 @@ class Settings(BaseSettings):
         from_attributes = True
 
 
+client = None
+db = None
+
+
 async def initiate_database():
+    global client, db
     client = AsyncIOMotorClient(Settings().DATABASE_URL)
-    await init_beanie(
-        database=client.get_default_database(), document_models=models.__all__
-    )
+    db = client.get_default_database()
+    await init_beanie(database=db, document_models=models.__all__)
