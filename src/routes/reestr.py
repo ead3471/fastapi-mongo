@@ -1,10 +1,6 @@
-from fastapi import APIRouter, FastAPI, HTTPException
-from pydantic import BaseModel, ValidationError
-from motor.motor_asyncio import AsyncIOMotorClient
-from bson.json_util import dumps, loads
-from models import (
-    ReestrObject,
-)  # Adjust the import path according to your project structure
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from models import ReestrObject
 from config.config import db
 
 

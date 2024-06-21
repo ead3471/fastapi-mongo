@@ -1,12 +1,8 @@
-import asyncio
-from beanie import init_beanie
-from fastapi.testclient import TestClient
 from httpx import AsyncClient
 import pytest
 
-from models.admin import Admin
-from models.student import Student
-from tests.conftest import mock_no_authentication
+
+from tests import mock_no_authentication
 
 
 class TestMockAuthentication:
