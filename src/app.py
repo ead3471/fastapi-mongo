@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Depends
 
 from config.config import initiate_database
-from routes.reestr_object import router as ReestrObjectTypeRouter
-from routes.reestr import router as ReestrRouter
+from routes.register_object import router as register_object_type_router
+from routes.register_object_type import router as register_router
 
 app = FastAPI()
 
@@ -13,13 +13,13 @@ async def start_database():
 
 
 app.include_router(
-    ReestrObjectTypeRouter,
-    tags=["Reestr Objects Types"],
-    prefix="/reestrtype",
+    register_object_type_router,
+    tags=["Register Objects Types"],
+    prefix="/register_type",
 )
 
 app.include_router(
-    ReestrRouter,
-    tags=["Reestr Objects"],
-    prefix="/reestr",
+    register_router,
+    tags=["Register Objects"],
+    prefix="/register",
 )

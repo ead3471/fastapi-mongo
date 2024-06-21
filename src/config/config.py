@@ -1,7 +1,7 @@
 from typing import Optional
 
 from beanie import init_beanie
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pydantic_settings import BaseSettings
 import models
 
@@ -19,12 +19,11 @@ class Settings(BaseSettings):
         from_attributes = True
 
 
-client = None
-db = None
+def get_db() -> AsyncIOMotorDatabase:
+    mongo_client = AsyncIOMotorClient(Settings().DATABASE_URL)
+    mondo_db = mongo_client.get_default_database()
+    return mondo_db
 
 
 async def initiate_database():
-    global client, db
-    client = AsyncIOMotorClient(Settings().DATABASE_URL)
-    db = client.get_default_database()
-    await init_beanie(database=db, document_models=models.__all__)
+    await init_beanie(database=get_db(), document_models=models.__all__)

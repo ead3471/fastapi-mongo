@@ -1,4 +1,4 @@
-from models.reestr_object import ReestrObject
+from models.register_object_type import RegisterObjectType
 
 
-__all__ = [ReestrObject]
+__all__ = [RegisterObjectType]
