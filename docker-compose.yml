@@ -10,14 +10,27 @@ services:
     depends_on:
       - mongodb
 
-
   mongodb:
-    image: bitnami/mongodb:latest
+    image: mongo:latest
+    environment:
+      MONGO_APP_DATABASE: 'test_db'
+      MONGO_REPLICA_HOST: host.docker.internal
+      MONGO_REPLICA_PORT: 27018
+    container_name: localdev-mongo
+    entrypoint: >
+      /bin/bash -c '
+      echo "rs.initiate()" > /docker-entrypoint-initdb.d/1-init-replicaset.js &&
+      echo "db = db.getSiblingDB(process.env[$0]);" > /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      echo "db.createCollection($1, { capped: false });" >> /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      echo "db.init.insert([{ message: $2 }]);" >> /docker-entrypoint-initdb.d/2-init-db-collection.js &&
+      /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --noauth' "'MONGO_APP_DATABASE'" "'init'" "'db initialized successfully'"
+    expose:
+      - 27017
     ports:
       - "27017:27017"
     volumes:
-      - data:/bitnami/mongodb
-
+      - mongodb-data:/data/db
+    restart: unless-stopped
 
 volumes:
-  data:
+  mongodb-data:

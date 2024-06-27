@@ -1,75 +1,86 @@
 import re
-from typing import List, Optional, Any
+from enum import Enum
+from typing import Self, TypeVar, Optional
 
 import jsonschema
 from beanie import Document
-from pydantic import field_validator, validator
+from bson import ObjectId
+from pydantic import field_validator, BaseModel, model_validator, Field
 
-from library.pydantic.fields import SlugField, JsonSchemaField
+from library.pydantic.fields import PyObjectId
+
+T = TypeVar('T', bound='SupportedTypes')
 
 
-class RegisterObjectType(Document):
+class SupportedTypes(str, Enum):
+    INT = 'integer'
+    BOOL = 'boolean'
+    FLOAT = 'float'
+    STRING = 'string'
+    LIST_OF_INTS = 'list_of_ints'
+    LIST_OF_BOOLS = 'list_of_bools'
+    LIST_OF_FLOAT = 'list_of_float'
+    LIST_OF_STRING = 'list_of_string'
+
+    def __repr__(self) -> str:
+        return str.__repr__(self.value)
+
+    def json_schema(self):
+        if not hasattr(self, "__json_spec"):
+            self.__json_spec = {
+                SupportedTypes.INT: {"bsonType": "int"},
+                SupportedTypes.BOOL: {"bsonType": "bool"},
+                SupportedTypes.FLOAT: {"bsonType": "double"},
+                SupportedTypes.STRING: {"bsonType": "string"},
+                SupportedTypes.LIST_OF_INTS: {
+                    "bsonType": "array",
+                    "items": {"bsonType": "int"}
+                },
+                SupportedTypes.LIST_OF_BOOLS: {
+                    "bsonType": "array",
+                    "items": {"bsonType": "bool"}
+                },
+                SupportedTypes.LIST_OF_FLOAT: {
+                    "bsonType": "array",
+                    "items": {"bsonType": "double"}
+                },
+                SupportedTypes.LIST_OF_STRING: {
+                    "bsonType": "array",
+                    "items": {"bsonType": "string"}
+                }
+            }
+
+        return self.__json_spec[self]
+
+
+class RegisterField(BaseModel):
+    name: str
+    optional: bool = False
+    type: SupportedTypes
+
+
+class RegisterObjectType(BaseModel):
+    id: PyObjectId = Field(alias='_id', default=None, serialization_alias='id')
     name: str
     description: str | None
+    slug: str
     notify_fields: list[str] | None
     unique_fields: list[str]
-    slug: str
-    json_schema: dict | None = None
+    fields: list[RegisterField]
 
-    @field_validator('json_schema')
-    def validate_json_schema(cls, v):
-        try:
-            jsonschema.Draft7Validator.check_schema(v)
-        except jsonschema.exceptions.SchemaError as e:
-            raise ValueError(f"Invalid JSON schema: {e}")
-        return v
+    @model_validator(mode='after')
+    def check_notify_and_unique_fields(self) -> Self:
+        fields = {field.name for field in self.fields}
+        if extra_fields := set(self.notify_fields) - fields:
+            raise ValueError(f"Notify fields contains unknown fields:{extra_fields}")
+        if extra_fields := set(self.unique_fields) - fields:
+            raise ValueError(f"unique fields contains unknown fields:{extra_fields}")
+        return self
 
-    @field_validator('slug')
-    def validate_slug(cls, v):
-        if not re.match(r'^[a-z0-9_]{3,}$', v):
-            raise ValueError(
-                ('Invalid slug format. Must be at least 3 characters long and '
-                 'contain only lowercase letters and numbers.'))
-        return v
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "Active Directory User!!",
-                "description": "Active Directory user objects",
-                "slug": "ad_user",
-                "notify_fields": ["title", "uac", "description", "groups", "is_fired"],
-                "unique_fields": ["samaccountname", ],
-                "json_schema": {
-                    "$schema": "some_url",
-                    "type": "object",
-                    "properties": {
-                        "samaccountname": {
-                            "type": "string",
-                            "description": "The SAM account name."
-                        },
-                        "uac": {
-                            "type": "integer",
-                            "description": "The User Account Control integer value."
-                        },
-                        "description": {
-                            "type": "string",
-                            "description": "A description of the register type object."
-                        },
-                        "groups": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "List of group names.",
-                        },
-                        "is_fired": {
-                            "type": "boolean",
-                            "description": "Indicates whether the user is fired.",
-                        },
-                    },
-                    "required": ["samaccountname"],
-                },
-            }
+    def fields_json_schema(self):
+        return {
+            "$jsonSchema": {"bsonType": "object",
+                            "required": [field.name for field in self.fields if not field.optional],
+                            "properties": {
+                                field.name: field.type.json_schema() for field in self.fields}}
         }
-
-    class Settings:
-        name = "register_object_type"

@@ -19,11 +19,14 @@ class Settings(BaseSettings):
         from_attributes = True
 
 
+SETTINGS = Settings()
+
+
 def get_db() -> AsyncIOMotorDatabase:
     mongo_client = AsyncIOMotorClient(Settings().DATABASE_URL)
     mondo_db = mongo_client.get_default_database()
     return mondo_db
 
 
-async def initiate_database():
-    await init_beanie(database=get_db(), document_models=models.__all__)
+
+
