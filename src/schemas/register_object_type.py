@@ -1,13 +1,13 @@
 from enum import Enum
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field, constr
 from typing_extensions import Self
 
 from library.pydantic.fields import PyObjectId
 from models.register_object_type import RegisterField
 
 
-class UpdateRegisterObjectTypeModel(BaseModel):
+class UpdateRegisterObjectTypeSchema(BaseModel):
     name: str | None = None
     description: str | None = None
     notify_fields: list[str] | None = None
@@ -19,24 +19,25 @@ class UpdateRegisterObjectTypeModel(BaseModel):
                 "name": "Active Directory User!",
                 "description": "Active Directory user objects",
                 "notify_fields": ["title", "uac", "description", "groups", "is_fired"],
+                "fields": ["field1", "field2", "field3"],
             }
         }
 
 
-class RegisterObjectTypeResponse(BaseModel):
+class RegisterObjectTypeResponseSchema(BaseModel):
     id: PyObjectId
     name: str
     description: str | None
     notify_fields: list[str] | None
-    json_schema: list[RegisterField]
     unique_fields: list[str]
+    fields: list[RegisterField]
     slug: str
 
 
-class RegisterObjectTypeCreate(BaseModel):
+class CreateRegisterObjectTypeSchema(BaseModel):
     name: str
     description: str | None
-    slug: str
+    slug: constr(pattern=r'^[a-z_]{1,10}$')
     notify_fields: list[str] | None
     unique_fields: list[str]
     fields: list[RegisterField]

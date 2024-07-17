@@ -1,19 +1,25 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Extra
+from bson import ObjectId
+from pydantic import BaseModel, Extra, Field
+
+from library.pydantic.fields import PyObjectId
 
 
-class HistoryRecord(BaseModel):
+class HistoryRecordModel(BaseModel):
+    history_id: PyObjectId = Field(default_factory=PyObjectId)
     history_datetime: datetime
     notify_fields: list[str]
 
     class Config:
-        extra = Extra.allow
+        json_encoders = {ObjectId: str}
+        extra = 'allow'
 
 
-class RegisterObject(BaseModel):
-    history: list[HistoryRecord]
-    notify_fields: list[str]
+class RegisterObjectModel(BaseModel):
+    id: PyObjectId = Field(alias='_id', default=None, serialization_alias='id')
+    notify_fields: list[str] = []
+    history: list[HistoryRecordModel] = []
 
     class Config:
-        extra = Extra.allow
+        extra = 'allow'

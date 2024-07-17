@@ -5,7 +5,7 @@ from typing import Self, TypeVar, Optional
 import jsonschema
 from beanie import Document
 from bson import ObjectId
-from pydantic import field_validator, BaseModel, model_validator, Field
+from pydantic import field_validator, BaseModel, model_validator, Field, constr
 
 from library.pydantic.fields import PyObjectId
 
@@ -13,14 +13,14 @@ T = TypeVar('T', bound='SupportedTypes')
 
 
 class SupportedTypes(str, Enum):
-    INT = 'integer'
-    BOOL = 'boolean'
+    INT = 'int'
+    BOOL = 'bool'
     FLOAT = 'float'
-    STRING = 'string'
-    LIST_OF_INTS = 'list_of_ints'
-    LIST_OF_BOOLS = 'list_of_bools'
+    STRING = 'str'
+    LIST_OF_INTS = 'list_of_int'
+    LIST_OF_BOOLS = 'list_of_bool'
     LIST_OF_FLOAT = 'list_of_float'
-    LIST_OF_STRING = 'list_of_string'
+    LIST_OF_STRING = 'list_of_str'
 
     def __repr__(self) -> str:
         return str.__repr__(self.value)
@@ -59,11 +59,11 @@ class RegisterField(BaseModel):
     type: SupportedTypes
 
 
-class RegisterObjectType(BaseModel):
+class RegisterObjectTypeModel(BaseModel):
     id: PyObjectId = Field(alias='_id', default=None, serialization_alias='id')
     name: str
     description: str | None
-    slug: str
+    slug: constr(pattern=r'^[a-z_]{1,10}$')
     notify_fields: list[str] | None
     unique_fields: list[str]
     fields: list[RegisterField]
@@ -71,16 +71,34 @@ class RegisterObjectType(BaseModel):
     @model_validator(mode='after')
     def check_notify_and_unique_fields(self) -> Self:
         fields = {field.name for field in self.fields}
-        if extra_fields := set(self.notify_fields) - fields:
-            raise ValueError(f"Notify fields contains unknown fields:{extra_fields}")
         if extra_fields := set(self.unique_fields) - fields:
-            raise ValueError(f"unique fields contains unknown fields:{extra_fields}")
+            raise ValueError(f"Unique fields list contains unknown fields:{extra_fields}")
+        
+        if extra_fields := set(self.notify_fields) - fields:
+            raise ValueError(f"Notify fields list contains unknown fields:{extra_fields}")
+
         return self
 
     def fields_json_schema(self):
+        base_properties = {field.name: field.type.json_schema() for field in self.fields}
+        base_properties["_id"] = {
+            "bsonType": "objectId"
+        }
+        base_properties["notify_fields"] = {
+            "bsonType": "array",
+            "items": {
+                "bsonType": "string"
+            }
+        }
+        # TODO: более точная спецификация истории?
+        base_properties["history"] = {
+            "bsonType": "array"
+        }
         return {
             "$jsonSchema": {"bsonType": "object",
                             "required": [field.name for field in self.fields if not field.optional],
-                            "properties": {
-                                field.name: field.type.json_schema() for field in self.fields}}
+                            "properties": base_properties,
+                            "additionalProperties": False
+                            }
+
         }

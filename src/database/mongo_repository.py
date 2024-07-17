@@ -1,7 +1,8 @@
 from functools import wraps
-from typing import Callable, Type, Iterable, TypeVar, Any
+from typing import Callable, Type, Iterable, TypeVar, Any, Mapping
 
-from fastapi import HTTPException
+from beanie import PydanticObjectId
+from fastapi import HTTPException, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorClient
 from pydantic import ValidationError, BaseModel
 from pymongo import ReturnDocument
@@ -13,14 +14,17 @@ from bson import SON
 
 
 class MongoDataBaseRepository:
-    def __init__(self, db_url: str):
-        # TODO: Исполльзвание синглтона для слиента и бд
-        self.client: AsyncIOMotorClient = AsyncIOMotorClient(db_url)
-        self.db: AsyncIOMotorDatabase = self.client.get_default_database()
+    def __init__(self):
+        self.db = get_db()
 
-    async def find_one(self, collection_name: str, query: dict):
+    async def find_one(self, collection_name: str, query: dict,
+                       exclude_fields: set = frozenset(),
+                       extra_filter: dict | None = None):
         collection = self.db[collection_name]
-        return await collection.find_one(query)
+        projection = {field: 0 for field in exclude_fields}
+        if extra_filter:
+            projection.update(extra_filter)
+        return await collection.find_one(query, projection)
 
     async def delete_one(self, collection_name: str, query: dict, session=None):
         collection = self.db[collection_name]
@@ -63,19 +67,23 @@ class MongoDataBaseRepository:
         data = await cursor.to_list(limit)
         return data
 
-    async def create_register_collection(self, collection_name, json_validation_schema: dict,
-                                         index_fields_spec: list[str],
-                                         level='strict', session=None):
+    async def create_collection(self, collection_name,
+                                json_validation_schema: dict,
+                                index_fields_spec: list[tuple[tuple[str, str | int], bool]],
+                                level='strict',
+                                session=None):
+        """Создание коллекции с заданными индексами и валидацией"""
         new_collection = await self.db.create_collection(collection_name,
                                                          validator=json_validation_schema,
                                                          validationLevel=level,
                                                          session=session,
                                                          )
 
-        await new_collection.create_index(
-            index_fields_spec,
-            unique=True,
-            session=session)
+        for index_spec in index_fields_spec:
+            await new_collection.create_index(
+                index_spec[0],
+                unique=index_spec[1],
+                session=session)
 
     async def update_schema(self, collection_name, json_schema: dict, level='strict',
                             session=None):
@@ -96,13 +104,13 @@ class MongoDataBaseRepository:
 
         index_spec = [(index_field, 1) for index_field in sorted(index_fields)]
 
-        await self.db.get_collection(collection_name,
-                                     # read_concern=ReadConcern("majority")
-                                     ).create_index(
-            index_spec,
-            unique=True,
-            session=session,
-        )
+        await self.db.get_collection(collection_name).create_index(index_spec,
+                                                                   unique=True,
+                                                                   session=session,
+                                                                   )
+
+    async def list_collections(self, session=None, filter: Mapping = None):
+        return await self.db.list_collection_names(session, filter)
 
 
 T = TypeVar('T', bound=BaseModel)
@@ -111,34 +119,48 @@ T = TypeVar('T', bound=BaseModel)
 class DataBaseObjectRepository:
     def __init__(self, collection_name: str, model: Type[T]):
         self.collection_name = collection_name
-        self.db = MongoDataBaseRepository(SETTINGS.DATABASE_URL)
+        self._repository = MongoDataBaseRepository()
         self.model = model
 
-    async def find_one(self, query: dict) -> T:
-        data = await self.db.find_one(self.collection_name, query)
-        return self.model.model_validate(data)
+    async def find_one(self, query: dict, exclude_fields: set = frozenset()) -> T | None:
+        data = await self._repository.find_one(self.collection_name, query, exclude_fields)
+        return self.model.model_validate(data) if data else None
+
+    async def find_one_by_id(self, object_id: PydanticObjectId, exclude_fields: set = frozenset()) -> T:
+        query = {'_id': object_id}
+        register_type_object: T = await self.find_one(query, exclude_fields)
+        return register_type_object
 
     async def delete_one(self, query: dict, session=None) -> bool:
-        deletion_result = await self.db.delete_one(self.collection_name, query, session=session)
+        deletion_result = await self._repository.delete_one(self.collection_name, query, session=session)
         return deletion_result is not None
 
+    async def delete_one_by_id(self, object_id: PydanticObjectId, session=None) -> bool:
+        query = {'_id': object_id}
+        deletion_result = await self._repository.delete_one(self.collection_name, query, session=session)
+        return deletion_result.deleted_count > 0
+
     async def bulk_write(self, operations: list):
-        return await self.db.bulk_write(self.collection_name, operations)
+        return await self._repository.bulk_write(self.collection_name, operations)
 
     async def insert_one(self, document: T, session=None) -> Any:
-        data = await self.db.insert_one(self.collection_name,
-                                        document.model_dump(exclude={'id'}),
-                                        session=session)
+        data = await self._repository.insert_one(self.collection_name,
+                                                 document.model_dump(exclude={'id'}),
+                                                 session=session)
         return data
 
+    async def collection_exists(self):
+        registered_collections = await self._repository.list_collections()
+        return self.collection_name in registered_collections
+
     async def update_one(self, query: dict, update: dict, session=None) -> T:
-        updated_data = await self.db.update_one(self.collection_name, query, update)
+        updated_data = await self._repository.update_one(self.collection_name, query, update)
         return self.model.model_validate(updated_data)
 
     async def find_one_and_update(self, query: dict, update: dict, session=None) -> T:
-        updated_data = await self.db.find_one_and_update(self.collection_name, query, update, session=session)
+        updated_data = await self._repository.find_one_and_update(self.collection_name, query, update, session=session)
         return self.model.model_validate(updated_data)
 
     async def find(self, query: dict = None, skip: int = 0, limit: int = None, sort: list = None) -> Iterable[T]:
-        filtered_data = await self.db.find(self.collection_name, query, skip, sort, limit)
+        filtered_data = await self._repository.find(self.collection_name, query, skip, sort, limit)
         return (self.model.model_validate(data) for data in filtered_data)
