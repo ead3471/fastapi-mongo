@@ -37,7 +37,7 @@ class RegisterObjectTypeResponseSchema(BaseModel):
 class CreateRegisterObjectTypeSchema(BaseModel):
     name: str
     description: str | None
-    slug: constr(pattern=r'^[a-z_]{1,10}$')
+    slug: constr(pattern=r'^[a-z0-9_]{1,32}$')
     notify_fields: list[str] | None
     unique_fields: list[str]
     fields: list[RegisterField]

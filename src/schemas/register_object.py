@@ -25,7 +25,8 @@ class UpdateRegisterObjectSchema(BaseModel):
 class RegisterObjectNoHistorySchema(BaseModel):
     id: PyObjectId
     notify_fields: list[str] | None = []
-    history: Any = Field(exclude=True)
+    history: Any = Field(exclude=True)  # Прописано здесь с exclude тк необходимо разрешить дополнительные поля
+    is_deactivated: bool
 
     class Config:
         extra = 'allow'

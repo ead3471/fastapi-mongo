@@ -5,7 +5,7 @@ from beanie import PydanticObjectId
 
 from database.mongo_repository import DataBaseObjectRepository, T
 from database.register_object_type_repository import get_object_default_notify_fields, get_object_unique_fields
-from library.pydantic.fields import PyObjectId
+
 from models.register_object import RegisterObjectModel, HistoryRecordModel
 
 
@@ -30,10 +30,10 @@ class MongoRegisterRepository(DataBaseObjectRepository):
             }})
         document_dump["history"][0]["history_id"] = document.history[0].history_id
 
-        data = await self._repository.insert_one(self.collection_name,
-                                                 document_dump,
-                                                 session=session)
-        return data
+        result_id = await self._repository.insert_one(self.collection_name,
+                                                      document_dump,
+                                                      session=session)
+        return await self.find_one_by_id(result_id, exclude_fields={'history'})
 
     async def get_object_history_record(self, object_id: PydanticObjectId, history_id: PydanticObjectId):
         data = await self._repository.find_one(self.collection_name,

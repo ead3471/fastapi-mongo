@@ -21,9 +21,12 @@ def get_repository(slug: str = None) -> MongoRegisterRepository:
     return MongoRegisterRepository(slug)
 
 
-@router.post("/register/{slug}/",
+@router.post("/{slug}/",
              description='Добавить объект зарегистрированного типа в реестр',
-             name='Добавить объект')
+             status_code=status.HTTP_201_CREATED,
+             name='create_register_object',
+             response_model=RegisterObjectNoHistorySchema
+             )
 async def create_object(slug: str, register_object_payload: CreateRegisterObjectSchema,
                         repository: MongoRegisterRepository = Depends(get_repository)):
     collection_exists = await repository.collection_exists()
@@ -31,25 +34,29 @@ async def create_object(slug: str, register_object_payload: CreateRegisterObject
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Register Object type {slug} not found")
 
     register_object = RegisterObjectModel(**register_object_payload.model_dump(exclude_unset=True))
-    result = await repository.insert_one(register_object)
+    result: RegisterObjectModel = await repository.insert_one(register_object)
 
-    return Response(status_code=status.HTTP_201_CREATED)
+    return result.model_dump()
 
 
-@router.get("/register/{slug}/{object_id}",
+@router.get("/{slug}/{object_id}",
             description='Получить объект зарегистрированного типа из реестра',
-            name="Получить объект",
+            name="get_register_object",
             response_model=RegisterObjectNoHistorySchema)
 async def get_object(slug: str,
                      object_id: PydanticObjectId,
                      repository: MongoRegisterRepository = Depends(get_repository)):
     result_object: RegisterObjectModel = await repository.find_one_by_id(object_id, {"history"})
+    if result_object is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Register Object type {slug}/{object_id} not found")
+
     return result_object.model_dump()
 
 
-@router.get("/register/{slug}/",
+@router.get("/{slug}/",
             description='Получить объекты зарегистрированного типа из реестра',
-            name="Получить объекты",
+            name="get_register_objects",
             response_model=list[RegisterObjectNoHistorySchema])
 async def get_objects(slug: str,
                       repository: MongoRegisterRepository = Depends(get_repository)):
@@ -57,9 +64,9 @@ async def get_objects(slug: str,
     return (result_object.model_dump() for result_object in result_objects)
 
 
-@router.delete("/register/{slug}/{object_id}",
+@router.delete("/{slug}/{object_id}",
                description='Удалить объект зарегистрированного типа из реестра',
-               name="Удалить объект", )
+               name="delete_register_object", )
 async def delete_object(slug: str,
                         object_id: PydanticObjectId,
                         repository: MongoRegisterRepository = Depends(get_repository)):
@@ -70,23 +77,39 @@ async def delete_object(slug: str,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
 
-@router.patch("/register/{slug}/{object_id}",
+@router.patch("/{slug}/{object_id}",
               description='Обновить объект зарегистрированного типа из реестра',
-              name="Обновить объект", )
+              name="update_register_object",
+              response_model=RegisterObjectNoHistorySchema)
 async def update_object(slug: str,
                         object_id: PydanticObjectId,
                         update_object_payload: UpdateRegisterObjectSchema,
                         repository: MongoRegisterRepository = Depends(get_repository)):
     result = await repository.update_one(object_id, update_object_payload.model_dump(exclude_unset=True))
     if result:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        return result.model_dump()
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
 
-@router.get("/register/{slug}/{object_id}/history/",
+@router.patch("/{slug}/{object_id}/deactivate",
+              description='Деактивировать объект',
+              name="deactivate_register_object",
+              response_model=RegisterObjectNoHistorySchema)
+async def update_object(slug: str,
+                        object_id: PydanticObjectId,
+                        repository: MongoRegisterRepository = Depends(get_repository)):
+    result = await repository.update_one(object_id, {"is_deactivated": True})
+    if result:
+        return result.model_dump()
+    else:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+
+# TODO: Добавить паджинацию и фильтрацию
+@router.get("/{slug}/{object_id}/history/",
             description='История объекта',
-            name="История объекта",
+            name="get_object_history_records_list",
             response_model=list[HistoryRecordModel])
 async def get_object_history(slug: str,
                              object_id: PydanticObjectId,
@@ -98,9 +121,9 @@ async def get_object_history(slug: str,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
 
-@router.get("/register/{slug}/{object_id}/history/{history_id}",
+@router.get("/{slug}/{object_id}/history/{history_id}",
             description='Историческая запись объекта',
-            name="Историческая запись объекта",
+            name="get_object_history_record",
             response_model=HistoryRecordModel)
 async def get_object_history_record(slug: str,
                                     object_id: PydanticObjectId,

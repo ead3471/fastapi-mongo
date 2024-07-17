@@ -1,6 +1,7 @@
 import asyncio
 from functools import lru_cache
 from types import UnionType
+from async_lru import alru_cache
 from typing import List, Union, Any, Iterable
 
 from beanie import PydanticObjectId
@@ -12,17 +13,15 @@ from models.register_object_type import RegisterObjectTypeModel
 
 register_object_collection = RegisterObjectTypeModel
 
-cache = TTLCache(maxsize=128, ttl=60)
-
 
 # TODO: Переписать на другую реализацию кэша
-@cached(cache)
+@alru_cache(maxsize=1024)
 async def get_object_default_notify_fields(slug: str):
     type_object: RegisterObjectTypeModel = await MongoRegisterTypeRepository().find_one({"slug": slug})
     return type_object.notify_fields
 
 
-@cached(cache)
+@alru_cache(maxsize=1024)
 async def get_object_unique_fields(slug: str):
     type_object = await MongoRegisterTypeRepository().find_one({"slug": slug})
     return type_object.unique_fields

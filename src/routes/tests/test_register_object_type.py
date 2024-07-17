@@ -12,9 +12,9 @@ from models import RegisterObjectTypeModel
 
 
 @pytest.mark.asyncio
-async def test_create_new_type(test_client: TestClient, register_type_all_fields: dict):
+async def test_create_new_type(test_client: TestClient, register_type_all_fields_data: dict):
     create_url = app.url_path_for("create_register_object_type")
-    response = test_client.post(create_url, json=register_type_all_fields)
+    response = test_client.post(create_url, json=register_type_all_fields_data)
     assert response.status_code == HTTPStatus.CREATED
 
     types_repository = MongoRegisterTypeRepository()
@@ -24,7 +24,7 @@ async def test_create_new_type(test_client: TestClient, register_type_all_fields
     # 2. Проверка наличия записи и ее соответствия запросу
     registered_types_records = iter(await types_repository.find())
     registered_type: RegisterObjectTypeModel = next(registered_types_records)
-    assert DeepDiff(registered_type.model_dump(exclude='id'), register_type_all_fields,
+    assert DeepDiff(registered_type.model_dump(exclude='id'), register_type_all_fields_data,
                     ignore_order=True) == {}
     # Проверка соответствия ответа исходным данным
     assert DeepDiff(response.json(), registered_type.model_dump(), ignore_order=True) == {}
@@ -40,37 +40,37 @@ async def test_create_new_type(test_client: TestClient, register_type_all_fields
 
 
 @pytest.mark.asyncio
-async def test_create_same_new_type_twice(test_client: TestClient, register_type_all_fields: dict):
+async def test_create_same_new_type_twice(test_client: TestClient, register_type_all_fields_data: dict):
     """Проверка ошибки при содании одного и того же типа данных"""
     create_url = app.url_path_for("create_register_object_type")
-    response = test_client.post(create_url, json=register_type_all_fields)
+    response = test_client.post(create_url, json=register_type_all_fields_data)
     assert response.status_code == HTTPStatus.CREATED
 
     # Начальная проверка того, что есть коллекции под типы и данные и в коллекции типов есть одна запись
     types_repository = MongoRegisterTypeRepository()
     assert len(list(await types_repository.find())) == 1
-    register_object_repository = MongoRegisterRepository(register_type_all_fields["slug"])
+    register_object_repository = MongoRegisterRepository(register_type_all_fields_data["slug"])
     assert register_object_repository.collection_exists()
 
-    response = test_client.post(create_url, json=register_type_all_fields)
+    response = test_client.post(create_url, json=register_type_all_fields_data)
     assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 @pytest.mark.asyncio
-async def test_create_new_type_with_bad_schema_value(test_client: TestClient, register_type_all_fields: dict):
+async def test_create_new_type_with_bad_schema_value(test_client: TestClient, register_type_all_fields_data: dict):
     """Проверка ошибки при содании типа данных из не валидных данных"""
     create_url = app.url_path_for("create_register_object_type")
-    register_type_all_fields['slug'] = 'bad collection name'
-    response = test_client.post(create_url, json=register_type_all_fields)
+    register_type_all_fields_data['slug'] = 'bad collection name'
+    response = test_client.post(create_url, json=register_type_all_fields_data)
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
 
 
 @pytest.mark.asyncio
-async def test_get_type(test_client: TestClient, register_type_all_fields):
+async def test_get_type(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на получение существующего объекта"""
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(
-        RegisterObjectTypeModel(**register_type_all_fields))
+        RegisterObjectTypeModel(**register_type_all_fields_data))
     registered_types_records = list(await types_repository.find())
     assert len(registered_types_records) == 1
 
@@ -83,11 +83,11 @@ async def test_get_type(test_client: TestClient, register_type_all_fields):
 
 
 @pytest.mark.asyncio
-async def test_get_type_list(test_client: TestClient, register_type_all_fields):
+async def test_get_type_list(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на получение списка существующих объектов"""
     types_repository = MongoRegisterTypeRepository()
     created_objects = []
-    base_object = RegisterObjectTypeModel(**register_type_all_fields)
+    base_object = RegisterObjectTypeModel(**register_type_all_fields_data)
     for index in range(4):
         type_object = RegisterObjectTypeModel(**base_object.model_dump(exclude={'slug', 'name'}),
                                               slug=f'test_slug_{index}',
@@ -106,11 +106,11 @@ async def test_get_type_list(test_client: TestClient, register_type_all_fields):
 
 
 @pytest.mark.asyncio
-async def test_get_non_existing_type(test_client: TestClient, register_type_all_fields):
+async def test_get_non_existing_type(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на получение не существующего объекта"""
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(
-        RegisterObjectTypeModel(**register_type_all_fields))
+        RegisterObjectTypeModel(**register_type_all_fields_data))
     registered_types_records = list(await types_repository.find())
     assert len(registered_types_records) == 1
 
@@ -120,9 +120,9 @@ async def test_get_non_existing_type(test_client: TestClient, register_type_all_
 
 
 @pytest.mark.asyncio
-async def test_delete_type(test_client: TestClient, register_type_all_fields):
+async def test_delete_type(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на удаление существующего объекта"""
-    existing_type = RegisterObjectTypeModel(**register_type_all_fields)
+    existing_type = RegisterObjectTypeModel(**register_type_all_fields_data)
 
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(existing_type)
@@ -139,9 +139,9 @@ async def test_delete_type(test_client: TestClient, register_type_all_fields):
 
 
 @pytest.mark.asyncio
-async def test_delete_non_existing_type(test_client: TestClient, register_type_all_fields):
+async def test_delete_non_existing_type(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на удаление не существующего объекта"""
-    existing_type = RegisterObjectTypeModel(**register_type_all_fields)
+    existing_type = RegisterObjectTypeModel(**register_type_all_fields_data)
 
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(existing_type)
@@ -158,9 +158,9 @@ async def test_delete_non_existing_type(test_client: TestClient, register_type_a
 
 
 @pytest.mark.asyncio
-async def test_update_object(test_client: TestClient, register_type_all_fields):
+async def test_update_object(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса на обновления существующего объекта"""
-    existing_type = RegisterObjectTypeModel(**register_type_all_fields)
+    existing_type = RegisterObjectTypeModel(**register_type_all_fields_data)
 
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(existing_type)
@@ -177,9 +177,9 @@ async def test_update_object(test_client: TestClient, register_type_all_fields):
 
 # TODO: Move to unit tests
 @pytest.mark.asyncio
-async def test_update_object_with_bad_notify_fields(test_client: TestClient, register_type_all_fields):
+async def test_update_object_with_bad_notify_fields(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса обновления существующего объекта  c установкой нотификации по несуществующим полям"""
-    existing_type = RegisterObjectTypeModel(**register_type_all_fields)
+    existing_type = RegisterObjectTypeModel(**register_type_all_fields_data)
 
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(existing_type)
@@ -193,12 +193,12 @@ async def test_update_object_with_bad_notify_fields(test_client: TestClient, reg
 
 # TODO: Move to unit tests
 @pytest.mark.asyncio
-async def test_update_object_with_bad_new_fields_list(test_client: TestClient, register_type_all_fields):
+async def test_update_object_with_bad_new_fields_list(test_client: TestClient, register_type_all_fields_data):
     """Проверка обработки запроса обновления существующего объекта  c обновлением списка полей,
     исключающим существующие уникальные поля
     Исходный объект содержит уникальные поля: int_field, string_field
     Предпринимается попытка убрать все поля и оставить только bool_field"""
-    existing_type = RegisterObjectTypeModel(**register_type_all_fields)
+    existing_type = RegisterObjectTypeModel(**register_type_all_fields_data)
 
     types_repository = MongoRegisterTypeRepository()
     created: RegisterObjectTypeModel = await types_repository.insert_one(existing_type)

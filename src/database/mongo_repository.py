@@ -51,9 +51,11 @@ class MongoDataBaseRepository:
                                                                   return_document=ReturnDocument.AFTER)
         return data
 
-    async def find(self, collection_name: str, query: dict, skip: int = 0, sort: list = None, limit: int = None):
+    async def find(self, collection_name: str, query: dict, skip: int = 0, sort: list = None, limit: int = None,
+                   exclude_fields: set = frozenset(), ):
         collection = self.db[collection_name]
-        cursor = collection.find(query)
+        projection = {field_name: 0 for field_name in exclude_fields}
+        cursor = collection.find(query, projection=projection)
 
         if skip:
             cursor = cursor.skip(skip)
@@ -161,6 +163,7 @@ class DataBaseObjectRepository:
         updated_data = await self._repository.find_one_and_update(self.collection_name, query, update, session=session)
         return self.model.model_validate(updated_data)
 
-    async def find(self, query: dict = None, skip: int = 0, limit: int = None, sort: list = None) -> Iterable[T]:
-        filtered_data = await self._repository.find(self.collection_name, query, skip, sort, limit)
+    async def find(self, query: dict = None, skip: int = 0, limit: int = None, sort: list = None,
+                   exclude_fields: set = frozenset()) -> Iterable[T]:
+        filtered_data = await self._repository.find(self.collection_name, query, skip, sort, limit, exclude_fields)
         return (self.model.model_validate(data) for data in filtered_data)

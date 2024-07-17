@@ -63,7 +63,7 @@ class RegisterObjectTypeModel(BaseModel):
     id: PyObjectId = Field(alias='_id', default=None, serialization_alias='id')
     name: str
     description: str | None
-    slug: constr(pattern=r'^[a-z_]{1,10}$')
+    slug: constr(pattern=r'^[a-z_0-9]{1,32}$')
     notify_fields: list[str] | None
     unique_fields: list[str]
     fields: list[RegisterField]
@@ -73,7 +73,7 @@ class RegisterObjectTypeModel(BaseModel):
         fields = {field.name for field in self.fields}
         if extra_fields := set(self.unique_fields) - fields:
             raise ValueError(f"Unique fields list contains unknown fields:{extra_fields}")
-        
+
         if extra_fields := set(self.notify_fields) - fields:
             raise ValueError(f"Notify fields list contains unknown fields:{extra_fields}")
 
@@ -89,6 +89,9 @@ class RegisterObjectTypeModel(BaseModel):
             "items": {
                 "bsonType": "string"
             }
+        }
+        base_properties["is_deactivated"] = {
+            "bsonType": "bool"
         }
         # TODO: более точная спецификация истории?
         base_properties["history"] = {
