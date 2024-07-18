@@ -59,6 +59,7 @@ class RegisterField(BaseModel):
     type: SupportedTypes
 
 
+# TODO: Генерация индексов по уникальным  slug и name
 class RegisterObjectTypeModel(BaseModel):
     id: PyObjectId = Field(alias='_id', default=None, serialization_alias='id')
     name: str

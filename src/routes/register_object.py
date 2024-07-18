@@ -48,6 +48,7 @@ async def get_object(slug: str,
     return result_object.model_dump()
 
 
+# TODO: Паджинация и фильтры
 @router.get("/{slug}/",
             description='Получить объекты зарегистрированного типа из реестра',
             name="get_register_objects",

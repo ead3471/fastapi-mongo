@@ -30,7 +30,7 @@ async def add_register_type_object(register_type_object: CreateRegisterObjectTyp
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=ex.details['errmsg'])
     return new_object
 
-
+#TODO: Паджинация и фильтры
 @router.get(
     "/",
     description="Получить все зарегистрированные типы объектов",
