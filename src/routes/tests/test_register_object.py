@@ -241,8 +241,8 @@ async def test_get_object_history_record(test_client: TestClient, register_objec
 @pytest.mark.asyncio
 async def test_get_object_history_records(test_client: TestClient, register_object_all_fields,
                                           register_type_object_all_fields_object):
-    """Проверка получения исторической записи объекта. Создается обект, обновляется 4 раза.
-    Проверяется что по запросу последней исторической записи возвращаются верные данные"""
+    """Проверка получения всех исторических записей объекта. Создается обект, обновляется 4 раза.
+    Проверяется что по запросу всех записей возвращается 5 объектов"""
 
     collection_name = register_type_object_all_fields_object.slug
 

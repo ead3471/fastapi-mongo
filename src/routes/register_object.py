@@ -3,13 +3,7 @@ from typing import Optional, Type, Iterable
 from beanie import PydanticObjectId
 from fastapi import APIRouter, HTTPException, Response, status, Depends
 
-from pydantic import BaseModel, ValidationError, create_model
-
 from database.register_object_repository import MongoRegisterRepository
-from library.pydantic.fields import PyObjectId
-from library.pydantic.models_generator import create_model_from_jsonschema
-from models import RegisterObjectTypeModel
-from config.config import get_db
 from models.register_object import RegisterObjectModel, HistoryRecordModel
 from schemas.register_object import CreateRegisterObjectSchema, RegisterObjectNoHistorySchema, \
     UpdateRegisterObjectSchema
